@@ -4,3 +4,6 @@ loguru
 python-dotenv
 retry
 openpyxl
+Flask
+Flask-CORS
+gunicorn
