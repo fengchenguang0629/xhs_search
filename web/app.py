@@ -173,7 +173,7 @@ def spider_search_notes():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/notes/search', methods=['POST'])
-def spider_search_formatted():
+def note_search_formatted():
     """
     搜索笔记并返回格式化的 JSON 数据
     请求体: {

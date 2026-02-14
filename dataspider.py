@@ -108,10 +108,17 @@ class FormattedDataSpider:
             if video_addr:
                 videos = [video_addr]
         
+        print(note_info)
         return {
             'id': note_info.get('note_id', ''),
-            'content': note_info.get('title', '') + ' ' + note_info.get('desc', ''),
+            "url": note_info.get('note_url', ''),
+            "title": note_info.get('title', ''),
+            'content': note_info.get('desc', ''),
             'note_type': note_type,
             'images': images,
-            'videos': videos
+            'videos': videos,
+            "liked_count": note_info.get('liked_count', 0),
+            "comment_count": note_info.get('comment_count', 0),
+            "share_count": note_info.get('share_count', 0),
+            "tags": note_info.get('tags', [])
         }
