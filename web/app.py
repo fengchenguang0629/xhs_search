@@ -1,4 +1,5 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
 from loguru import logger
 import os
 import sys
@@ -11,7 +12,13 @@ from dataspider import FormattedDataSpider
 from xhs_utils.common_util import init
 from xhs_utils.cookie_util import trans_cookies
 
-app = Flask(__name__)
+# 获取当前 web 目录路径
+WEB_DIR = os.path.dirname(os.path.abspath(__file__))
+
+app = Flask(__name__, static_folder=WEB_DIR, static_url_path='')
+# 启用 CORS 支持跨域请求
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
 global_cookies = None      # 全局 cookies
 data_spider = None         # 爬虫实例
 formatted_spider = None    # 格式化爬虫实例
@@ -29,6 +36,11 @@ def init_app():
     except Exception as e:
         logger.error(f"初始化失败: {e}")
         return False
+
+@app.route('/', methods=['GET'])
+def index():
+    """提供主页"""
+    return send_from_directory(WEB_DIR, 'index.html')
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -228,4 +240,4 @@ def error(e):
 if __name__ == '__main__':
     if not init_app():
         sys.exit(1)
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=False)
