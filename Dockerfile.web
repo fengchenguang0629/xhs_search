@@ -1,20 +1,14 @@
-FROM python:3.10-slim
+FROM node:18-bullseye AS base
+
+FROM python:3.12-slim
+
+# 从 Node.js 镜像复制整个 /usr/local 目录以确保所有依赖都被复制
+COPY --from=base /usr/local /usr/local
 
 WORKDIR /app
 
-# 安装系统依赖和 Node.js
-RUN apt-get update && apt-get install -y \
-    curl \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# 安装 Node.js
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    rm -rf /var/lib/apt/lists/*
-
 # 安装 NPM 依赖
-COPY package.json package-lock.json .
+COPY package.json package-lock.json ./
 RUN npm install
 
 # 安装 Python 依赖
@@ -25,14 +19,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # 暴露端口
+
 EXPOSE 5000
 
 # 环境变量
 ENV PYTHONUNBUFFERED=1
-
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
 
 # 启动服务
 CMD ["python", "-m", "web.app"]

@@ -2,16 +2,13 @@
 # XHS Spider Web 启动脚本
 # 用法: ./run.sh web         - 本地运行
 #      ./run.sh docker       - Docker 运行
-#      ./run.sh push <addr>  - 推送镜像到 Registry（如: ./run.sh push 192.168.1.100:5000）
-#      ./run.sh pull <addr>  - 从 Registry 拉取镜像并运行
-#      ./run.sh registry     - 启动本地 Registry 服务
+#      ./run.sh build        - 构建新镜像
 
 set -e
 
 MODE=${1:-web}
 IMAGE_NAME="xhs-spider-web"
 CONTAINER_NAME="xhs-spider-web"
-REGISTRY_PORT="5000"
 SERVICE_PORT="5000"
 
 # 颜色定义
@@ -43,7 +40,7 @@ run_web() {
     check_env
     
     echo "[1] 安装 Python 依赖..."
-    pip install -q -r requirements.txt
+    uv pip install -q -r requirements.txt
     
     echo "[2] 安装 NPM 依赖..."
     npm install
@@ -82,7 +79,7 @@ run_docker() {
     
     # 构建镜像
     echo -e "${YELLOW}[2] 构建镜像...${NC}"
-    docker build -f Dockerfile.web -t ${IMAGE_NAME}:latest .
+    sudo docker build --network=host -f Dockerfile.web -t ${IMAGE_NAME}:latest .
     
     if [ $? -ne 0 ]; then
         echo -e "${RED}构建失败${NC}"
@@ -129,10 +126,10 @@ run_docker() {
     echo ""
 }
 
-# 启动本地 Registry
-start_registry() {
+# 构建新镜像
+build_image() {
     echo -e "${GREEN}=========================================="
-    echo "启动本地 Docker Registry"
+    echo "构建 Docker 镜像"
     echo "==========================================${NC}\n"
     
     # 检查 Docker
@@ -141,150 +138,16 @@ start_registry() {
         exit 1
     fi
     
-    # 停止旧 Registry
-    if docker ps -a --format '{{.Names}}' | grep -q "^registry$"; then
-        echo "停止旧 Registry..."
-        docker stop registry || true
-        docker rm registry || true
-    fi
-    
-    # 启动 Registry
-    echo "启动 Registry 服务..."
-    docker run -d \
-        -p ${REGISTRY_PORT}:5000 \
-        --name registry \
-        --restart unless-stopped \
-        registry:2
-    
-    sleep 2
-    
-    if docker ps --format '{{.Names}}' | grep -q "^registry$"; then
-        echo -e "${GREEN}✓ Registry 已启动${NC}"
-        echo ""
-        echo "获取本机 IP 地址:"
-        echo "  Linux/Mac: ifconfig 或 hostname -I"
-        echo "  Windows: ipconfig"
-        echo ""
-        echo "其他电脑使用 Registry:"
-        echo "  ./run.sh push <本机IP>:5000"
-    else
-        echo -e "${RED}✗ Registry 启动失败${NC}"
-        exit 1
-    fi
-}
-
-# 推送镜像到 Registry
-push_to_registry() {
-    local registry_addr=$2
-    
-    if [ -z "$registry_addr" ]; then
-        echo -e "${RED}错误: 需要指定 Registry 地址${NC}"
-        echo "用法: ./run.sh push <registry_addr>"
-        echo "示例: ./run.sh push 192.168.1.100:5000"
-        exit 1
-    fi
-    
-    echo -e "${GREEN}=========================================="
-    echo "推送镜像到 Registry"
-    echo "==========================================${NC}\n"
-    
-    # 检查 Docker
-    if ! command -v docker &> /dev/null; then
-        echo -e "${RED}错误: Docker 未安装${NC}"
-        exit 1
-    fi
-    
-    # 构建镜像（如果不存在）
-    if ! docker images | grep -q "^${IMAGE_NAME}"; then
-        echo "构建镜像..."
-        docker build -f Dockerfile.web -t ${IMAGE_NAME}:latest .
-    fi
-    
-    # 标记镜像
-    echo "标记镜像: ${registry_addr}/${IMAGE_NAME}:latest"
-    docker tag ${IMAGE_NAME}:latest ${registry_addr}/${IMAGE_NAME}:latest
-    
-    # 推送镜像
-    echo "推送镜像到 ${registry_addr}..."
-    docker push ${registry_addr}/${IMAGE_NAME}:latest
+    echo -e "${YELLOW}[1] 构建镜像: ${IMAGE_NAME}:latest${NC}"
+    sudo docker build --network=host -f Dockerfile.web -t ${IMAGE_NAME}:latest .
     
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✓ 镜像推送成功${NC}"
+        echo -e "${GREEN}✓ 镜像构建成功${NC}"
         echo ""
-        echo "在另外一台电脑上执行:"
-        echo "  ./run.sh pull ${registry_addr}"
+        echo "可以执行以下命令启动容器:"
+        echo "  ./run.sh docker"
     else
-        echo -e "${RED}✗ 推送失败${NC}"
-        exit 1
-    fi
-}
-
-# 从 Registry 拉取镜像并运行
-pull_from_registry() {
-    local registry_addr=$2
-    
-    if [ -z "$registry_addr" ]; then
-        echo -e "${RED}错误: 需要指定 Registry 地址${NC}"
-        echo "用法: ./run.sh pull <registry_addr>"
-        echo "示例: ./run.sh pull 192.168.1.100:5000"
-        exit 1
-    fi
-    
-    echo -e "${GREEN}=========================================="
-    echo "从 Registry 拉取镜像"
-    echo "==========================================${NC}\n"
-    
-    check_env
-    
-    # 检查 Docker
-    if ! command -v docker &> /dev/null; then
-        echo -e "${RED}错误: Docker 未安装${NC}"
-        exit 1
-    fi
-    
-    # 停止旧容器
-    if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-        echo "停止旧容器..."
-        docker stop ${CONTAINER_NAME} || true
-        docker rm ${CONTAINER_NAME} || true
-    fi
-    
-    # 拉取镜像
-    echo "从 ${registry_addr} 拉取镜像..."
-    docker pull ${registry_addr}/${IMAGE_NAME}:latest
-    
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}拉取失败${NC}"
-        exit 1
-    fi
-    
-    # 标记镜像
-    docker tag ${registry_addr}/${IMAGE_NAME}:latest ${IMAGE_NAME}:latest
-    
-    # 创建数据目录
-    echo "创建数据目录..."
-    create_dirs
-    
-    # 启动容器
-    echo "启动容器..."
-    docker run -d \
-        -p ${SERVICE_PORT}:5000 \
-        -e PYTHONUNBUFFERED=1 \
-        -v "$(pwd)/datas:/app/datas" \
-        -v "$(pwd)/.env:/app/.env:ro" \
-        --name ${CONTAINER_NAME} \
-        --restart unless-stopped \
-        ${IMAGE_NAME}:latest
-    
-    sleep 3
-    
-    if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-        echo -e "${GREEN}✓ 服务已启动${NC}"
-        echo ""
-        echo "访问地址: http://localhost:${SERVICE_PORT}"
-    else
-        echo -e "${RED}✗ 启动失败${NC}"
-        docker logs ${CONTAINER_NAME}
+        echo -e "${RED}✗ 构建失败${NC}"
         exit 1
     fi
 }
@@ -296,21 +159,7 @@ show_help() {
     echo "本地模式:"
     echo "  ./run.sh web              - 本地运行 Python 服务"
     echo "  ./run.sh docker           - Docker 本地运行"
-    echo ""
-    echo "Registry 模式（局域网共享）:"
-    echo "  ./run.sh registry         - 在一台电脑启动 Registry 服务"
-    echo "  ./run.sh push <addr>      - 构建并推送镜像到 Registry"
-    echo "  ./run.sh pull <addr>      - 从 Registry 拉取镜像并运行"
-    echo ""
-    echo "示例:"
-    echo "  电脑 A（Registry 服务器）:"
-    echo "    ./run.sh registry"
-    echo ""
-    echo "  电脑 A（构建并推送）:"
-    echo "    ./run.sh push 192.168.1.100:5000"
-    echo ""
-    echo "  电脑 B（拉取并运行）:"
-    echo "    ./run.sh pull 192.168.1.100:5000"
+    echo "  ./run.sh build            - 构建新镜像"
     echo ""
 }
 
@@ -322,14 +171,8 @@ case $MODE in
     docker)
         run_docker
         ;;
-    registry)
-        start_registry
-        ;;
-    push)
-        push_to_registry "$@"
-        ;;
-    pull)
-        pull_from_registry "$@"
+    build)
+        build_image
         ;;
     *)
         show_help

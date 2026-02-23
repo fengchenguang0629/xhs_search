@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小红书爬虫 - Web 界面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            background: white;
+            color: #667eea;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .tab-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .tab-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .card.active {
+            display: block;
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            flex: 1;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            flex: 1;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .response-box {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .response-box.error {
+            background: #fee;
+            border-color: #f88;
+            color: #c33;
+        }
+
+        .response-box.success {
+            background: #efe;
+            border-color: #8f8;
+            color: #3c3;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-right: 10px;
+        }
+
+        .status-badge.healthy {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info-text {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            border-radius: 3px;
+            font-size: 14px;
+            color: #0c5aa0;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 小红书爬虫</h1>
+            <p>XHS Spider Web Interface</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('health')">健康检查</button>
+            <button class="tab-btn" onclick="switchTab('cookies')">设置 Cookies</button>
+            <button class="tab-btn" onclick="switchTab('search')">搜索笔记</button>
+            <button class="tab-btn" onclick="switchTab('user')">爬取用户笔记</button>
+            <button class="tab-btn" onclick="switchTab('note')">爬取单个笔记</button>
+        </div>
+
+        <!-- 健康检查 -->
+        <div id="health" class="card active">
+            <h2>健康检查</h2>
+            <div class="info-text">
+                检查服务是否正常运行
+            </div>
+            <button class="btn-primary" onclick="checkHealth()">检查服务状态</button>
+            <div class="response-box" id="healthResponse" style="display: none;"></div>
+        </div>
+
+        <!-- 设置 Cookies -->
+        <div id="cookies" class="card">
+            <h2>设置 Cookies</h2>
+            <div class="info-text">
+                在此设置小红书的 cookies，用于后续的爬虫操作
+            </div>
+            <div class="form-group">
+                <label for="cookiesInput">Cookies (复制浏览器开发者工具中的 cookies):</label>
+                <textarea id="cookiesInput" placeholder="粘贴完整的 cookies 字符串"></textarea>
+            </div>
+            <div class="button-group">
+                <button class="btn-primary" onclick="setCookies()">保存 Cookies</button>
+                <button class="btn-secondary" onclick="clearCookies()">清空</button>
+            </div>
+            <div class="response-box" id="cookiesResponse" style="display: none;"></div>
+        </div>
+
+        <!-- 搜索笔记 -->
+        <div id="search" class="card">
+            <h2>搜索笔记</h2>
+            <div class="info-text">
+                搜索小红书笔记并获取格式化的数据结果
+            </div>
+            <div class="form-group">
+                <label for="searchQuery">搜索关键词:</label>
+                <input type="text" id="searchQuery" placeholder="输入搜索关键词" value="美食">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="searchNum">数量:</label>
+                    <input type="number" id="searchNum" placeholder="要搜索的笔记数量" value="10" min="1" max="100">
+                </div>
+                <div class="form-group">
+                    <label for="sortType">排序方式:</label>
+                    <select id="sortType">
+                        <option value="0">综合</option>
+                        <option value="1">最新</option>
+                        <option value="2">最热</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="noteType">笔记类型:</label>
+                    <select id="noteType">
+                        <option value="0">全部</option>
+                        <option value="1">视频</option>
+                        <option value="2">普通</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="noteTime">时间范围:</label>
+                    <select id="noteTime">
+                        <option value="0">全部</option>
+                        <option value="1">1天内</option>
+                        <option value="2">1周内</option>
+                        <option value="3">6月内</option>
+                    </select>
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="btn-primary" onclick="searchNotes()">开始搜索</button>
+                <button class="btn-secondary" onclick="clearSearchResponse()">清空结果</button>
+            </div>
+            <div class="loading" id="searchLoading">
+                <span class="spinner"></span>
+                <span>正在搜索...</span>
+            </div>
+            <div class="response-box" id="searchResponse" style="display: none;"></div>
+        </div>
+
+        <!-- 爬取用户笔记 -->
+        <div id="user" class="card">
+            <h2>爬取用户笔记</h2>
+            <div class="info-text">
+                爬取指定用户的所有笔记
+            </div>
+            <div class="form-group">
+                <label for="userUrl">用户链接:</label>
+                <input type="text" id="userUrl" placeholder="输入用户主页链接 (https://www.xiaohongshu.com/user/...)">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="saveChoice">保存方式:</label>
+                    <select id="saveChoice">
+                        <option value="all">全部 (Excel + 媒体)</option>
+                        <option value="excel">仅 Excel</option>
+                        <option value="media">仅媒体</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="excelName">Excel 文件名:</label>
+                    <input type="text" id="excelName" placeholder="输出文件名 (不含扩展名)">
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="btn-primary" onclick="spiderUserNotes()">开始爬取</button>
+                <button class="btn-secondary" onclick="clearUserResponse()">清空结果</button>
+            </div>
+            <div class="loading" id="userLoading">
+                <span class="spinner"></span>
+                <span>正在爬取...</span>
+            </div>
+            <div class="response-box" id="userResponse" style="display: none;"></div>
+        </div>
+
+        <!-- 爬取单个笔记 -->
+        <div id="note" class="card">
+            <h2>爬取单个笔记</h2>
+            <div class="info-text">
+                爬取并获取单个笔记的详细信息
+            </div>
+            <div class="form-group">
+                <label for="noteUrl">笔记链接:</label>
+                <input type="text" id="noteUrl" placeholder="输入笔记链接 (https://www.xiaohongshu.com/explore/...)">
+            </div>
+            <div class="button-group">
+                <button class="btn-primary" onclick="spiderNote()">开始爬取</button>
+                <button class="btn-secondary" onclick="clearNoteResponse()">清空结果</button>
+            </div>
+            <div class="loading" id="noteLoading">
+                <span class="spinner"></span>
+                <span>正在爬取...</span>
+            </div>
+            <div class="response-box" id="noteResponse" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+
+        // 标签切换
+        function switchTab(tabName) {
+            document.querySelectorAll('.card').forEach(card => card.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // 显示响应结果
+        function showResponse(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+            element.classList.remove('error', 'success');
+            element.classList.add(isError ? 'error' : 'success');
+            element.style.display = 'block';
+        }
+
+        // 隐藏加载状态
+        function hideLoading(elementId) {
+            document.getElementById(elementId).classList.remove('active');
+        }
+
+        // 显示加载状态
+        function showLoading(elementId) {
+            document.getElementById(elementId).classList.add('active');
+        }
+
+        // 健康检查
+        async function checkHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                const responseBox = document.getElementById('healthResponse');
+                if (response.ok) {
+                    responseBox.innerHTML = `<span class="status-badge healthy">✓ 服务正常</span>\n${JSON.stringify(data, null, 2)}`;
+                    responseBox.classList.remove('error');
+                    responseBox.classList.add('success');
+                } else {
+                    responseBox.innerHTML = `<span class="status-badge error">✗ 服务异常</span>\n${JSON.stringify(data, null, 2)}`;
+                    responseBox.classList.remove('success');
+                    responseBox.classList.add('error');
+                }
+                responseBox.style.display = 'block';
+            } catch (error) {
+                showResponse('healthResponse', `错误: ${error.message}`, true);
+            }
+        }
+
+        // 设置 Cookies
+        async function setCookies() {
+            const cookies = document.getElementById('cookiesInput').value.trim();
+            if (!cookies) {
+                alert('请输入 cookies');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/cookies`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ cookies })
+                });
+
+                const data = await response.json();
+                showResponse('cookiesResponse', data, !response.ok);
+            } catch (error) {
+                showResponse('cookiesResponse', `错误: ${error.message}`, true);
+            }
+        }
+
+        // 清空 Cookies
+        function clearCookies() {
+            document.getElementById('cookiesInput').value = '';
+            document.getElementById('cookiesResponse').style.display = 'none';
+        }
+
+        // 搜索笔记
+        async function searchNotes() {
+            const query = document.getElementById('searchQuery').value.trim();
+            const requireNum = parseInt(document.getElementById('searchNum').value);
+            const sortType = parseInt(document.getElementById('sortType').value);
+            const noteType = parseInt(document.getElementById('noteType').value);
+            const noteTime = parseInt(document.getElementById('noteTime').value);
+
+            if (!query) {
+                alert('请输入搜索关键词');
+                return;
+            }
+
+            try {
+                showLoading('searchLoading');
+                const response = await fetch(`${API_BASE}/api/notes/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query,
+                        require_num: requireNum,
+                        sort_type_choice: sortType,
+                        note_type: noteType,
+                        note_time: noteTime
+                    })
+                });
+
+                const data = await response.json();
+                showResponse('searchResponse', data, !response.ok);
+            } catch (error) {
+                showResponse('searchResponse', `错误: ${error.message}`, true);
+            } finally {
+                hideLoading('searchLoading');
+            }
+        }
+
+        function clearSearchResponse() {
+            document.getElementById('searchResponse').style.display = 'none';
+        }
+
+        // 爬取用户笔记
+        async function spiderUserNotes() {
+            const userUrl = document.getElementById('userUrl').value.trim();
+            const saveChoice = document.getElementById('saveChoice').value;
+            const excelName = document.getElementById('excelName').value.trim();
+
+            if (!userUrl) {
+                alert('请输入用户链接');
+                return;
+            }
+
+            if (saveChoice !== 'media' && !excelName) {
+                alert('请输入 Excel 文件名');
+                return;
+            }
+
+            try {
+                showLoading('userLoading');
+                const response = await fetch(`${API_BASE}/api/spider/user-notes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_url: userUrl,
+                        save_choice: saveChoice,
+                        excel_name: excelName
+                    })
+                });
+
+                const data = await response.json();
+                showResponse('userResponse', data, !response.ok);
+            } catch (error) {
+                showResponse('userResponse', `错误: ${error.message}`, true);
+            } finally {
+                hideLoading('userLoading');
+            }
+        }
+
+        function clearUserResponse() {
+            document.getElementById('userResponse').style.display = 'none';
+        }
+
+        // 爬取单个笔记
+        async function spiderNote() {
+            const noteUrl = document.getElementById('noteUrl').value.trim();
+
+            if (!noteUrl) {
+                alert('请输入笔记链接');
+                return;
+            }
+
+            try {
+                showLoading('noteLoading');
+                const response = await fetch(`${API_BASE}/api/spider/note`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        note_url: noteUrl
+                    })
+                });
+
+                const data = await response.json();
+                showResponse('noteResponse', data, !response.ok);
+            } catch (error) {
+                showResponse('noteResponse', `错误: ${error.message}`, true);
+            } finally {
+                hideLoading('noteLoading');
+            }
+        }
+
+        function clearNoteResponse() {
+            document.getElementById('noteResponse').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
