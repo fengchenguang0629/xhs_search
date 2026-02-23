@@ -28,7 +28,7 @@ class ImageProcessor:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
 
-    def download_and_encode_image(self, image_url: str) -> Optional[Dict[str, str]]:
+    def download_and_encode_image(self, image_url: str) -> Optional[Dict[str, str | int]]:
         """
         下载图片并转为base64编码
 
@@ -191,7 +191,7 @@ def process_xhs_images(notes: List[Dict], timeout: int = 10) -> List[Dict]:
     return processor.process_notes_batch(notes)
 
 
-def get_image_base64(image_url: str, timeout: int = 10) -> Optional[Dict]:
+def get_image_base64(image_url: str, timeout: int = 10) -> Optional[Dict[str, str | int]]:
     """
     快捷函数：获取单张图片的base64编码
 
