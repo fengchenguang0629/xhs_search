@@ -1,8 +1,9 @@
+import os
+import sys
+
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from loguru import logger
-import os
-import sys
 
 # 添加父目录到路径以导入 main 模块
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -47,6 +48,18 @@ def health():
     """健康检查端点"""
     return jsonify({'status': 'healthy'}), 200
 
+def save_cookies_to_env(cookies_str):
+    """将 cookies 保存到 .env 文件"""
+    try:
+        env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
+        with open(env_path, 'w', encoding='utf-8') as f:
+            f.write(f"COOKIES='{cookies_str}'\n")
+        logger.info(f"Cookies 已保存到 {env_path}")
+        return True
+    except Exception as e:
+        logger.error(f"保存 cookies 到 .env 失败: {e}")
+        return False
+
 @app.route('/api/cookies', methods=['POST'])
 def set_cookies():
     """
@@ -63,6 +76,10 @@ def set_cookies():
         
         global global_cookies
         global_cookies = cookies_str
+
+        # 保存到 .env 文件
+        save_cookies_to_env(cookies_str)
+
         logger.info("Cookies 已更新")
         return jsonify({'status': 'success'}), 200
     except Exception as e:
