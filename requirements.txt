@@ -7,3 +7,5 @@ openpyxl
 Flask
 Flask-CORS
 gunicorn
+openai
+Pillow

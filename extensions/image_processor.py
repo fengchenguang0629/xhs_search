@@ -7,7 +7,8 @@
 
 import base64
 import io
-from typing import Dict, List, Optional
+from pathlib import Path
+from typing import Dict, List, Optional, Union
 
 import requests
 from PIL import Image
@@ -96,6 +97,177 @@ class ImageProcessor:
             print(f"[警告] 图片压缩失败: {e}")
             # 压缩失败返回原始数据
             return image_data
+
+    def compress_image_file(
+        self,
+        image_source: Union[str, Path, bytes, Image.Image],
+        max_width: int = None,
+        max_height: int = None,
+        quality: int = None,
+        output_format: str = 'JPEG'
+    ) -> bytes:
+        """
+        通用图片压缩方法，支持多种输入类型
+
+        Args:
+            image_source: 图片源，可以是：
+                - 文件路径（str 或 Path）
+                - 图片字节数据（bytes）
+                - PIL Image 对象
+            max_width: 压缩后最大宽度，默认使用实例配置
+            max_height: 压缩后最大高度，默认使用实例配置
+            quality: 压缩质量 (1-100)，默认使用实例配置
+            output_format: 输出格式，支持 'JPEG', 'PNG', 'WEBP' 等
+
+        Returns:
+            压缩后的图片字节数据
+
+        Raises:
+            FileNotFoundError: 当文件路径不存在时
+            ValueError: 当输入类型不支持时
+        """
+        max_width = max_width or self.max_width
+        max_height = max_height or self.max_height
+        quality = quality or self.quality
+
+        try:
+            # 根据输入类型加载图片
+            if isinstance(image_source, (str, Path)):
+                # 从文件路径加载
+                image_path = Path(image_source)
+                if not image_path.exists():
+                    raise FileNotFoundError(f"图片文件不存在: {image_path}")
+                img = Image.open(image_path)
+            elif isinstance(image_source, bytes):
+                # 从字节数据加载
+                img = Image.open(io.BytesIO(image_source))
+            elif isinstance(image_source, Image.Image):
+                # 直接使用 PIL Image 对象
+                img = image_source
+            else:
+                raise ValueError(f"不支持的图片源类型: {type(image_source)}")
+
+            # 转换颜色模式
+            if output_format == 'JPEG':
+                # JPEG 不支持透明度，转换为 RGB
+                if img.mode in ('RGBA', 'P', 'LA'):
+                    # 创建白色背景
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                    img = background
+                elif img.mode != 'RGB':
+                    img = img.convert('RGB')
+            elif output_format == 'PNG' and img.mode not in ('RGB', 'RGBA'):
+                img = img.convert('RGBA')
+
+            # 计算缩放比例
+            width, height = img.size
+            if width > max_width or height > max_height:
+                ratio = min(max_width / width, max_height / height)
+                new_size = (int(width * ratio), int(height * ratio))
+                img = img.resize(new_size, Image.Resampling.LANCZOS)
+
+            # 压缩并保存到字节流
+            output = io.BytesIO()
+            save_kwargs = {'format': output_format, 'optimize': True}
+            
+            if output_format == 'JPEG':
+                save_kwargs['quality'] = quality
+            elif output_format == 'PNG':
+                save_kwargs['compress_level'] = 9  # PNG 最大压缩级别
+            elif output_format == 'WEBP':
+                save_kwargs['quality'] = quality
+                save_kwargs['method'] = 6  # 压缩方法 (0-6, 6最慢但最小)
+
+            img.save(output, **save_kwargs)
+            compressed_data = output.getvalue()
+
+            print(f"[信息] 图片压缩完成: {width}x{height} -> {img.size[0]}x{img.size[1]}, "
+                  f"格式: {output_format}, 大小: {len(compressed_data)} 字节")
+
+            return compressed_data
+
+        except Exception as e:
+            print(f"[错误] 图片压缩失败: {e}")
+            # 如果输入是字节数据且压缩失败，返回原始数据
+            if isinstance(image_source, bytes):
+                return image_source
+            raise
+
+    def image_to_base64(
+        self,
+        image_source: Union[str, Path, bytes, Image.Image],
+        compress: bool = False,
+        max_width: int = None,
+        max_height: int = None,
+        quality: int = None,
+        output_format: str = 'JPEG'
+    ) -> str:
+        """
+        将图片转换为base64编码字符串
+
+        Args:
+            image_source: 图片源，可以是：
+                - 文件路径（str 或 Path）
+                - 图片字节数据（bytes）
+                - PIL Image 对象
+            compress: 是否压缩图片
+            max_width: 压缩后最大宽度（仅在compress=True时有效）
+            max_height: 压缩后最大高度（仅在compress=True时有效）
+            quality: 压缩质量（仅在compress=True时有效）
+            output_format: 输出格式（仅在compress=True时有效）
+
+        Returns:
+            base64编码的字符串
+
+        Examples:
+            >>> processor = ImageProcessor()
+            >>> # 从文件路径
+            >>> base64_str = processor.image_to_base64('/path/to/image.jpg')
+            >>> # 从字节数据
+            >>> with open('image.jpg', 'rb') as f:
+            ...     base64_str = processor.image_to_base64(f.read())
+            >>> # 压缩后转base64
+            >>> base64_str = processor.image_to_base64('image.jpg', compress=True, quality=60)
+        """
+        try:
+            # 如果需要压缩
+            if compress:
+                image_data = self.compress_image_file(
+                    image_source,
+                    max_width=max_width,
+                    max_height=max_height,
+                    quality=quality,
+                    output_format=output_format
+                )
+            else:
+                # 不压缩，直接获取字节数据
+                if isinstance(image_source, (str, Path)):
+                    image_path = Path(image_source)
+                    if not image_path.exists():
+                        raise FileNotFoundError(f"图片文件不存在: {image_path}")
+                    with open(image_path, 'rb') as f:
+                        image_data = f.read()
+                elif isinstance(image_source, bytes):
+                    image_data = image_source
+                elif isinstance(image_source, Image.Image):
+                    # PIL Image 对象需要转为字节
+                    output = io.BytesIO()
+                    img_format = image_source.format or 'PNG'
+                    image_source.save(output, format=img_format)
+                    image_data = output.getvalue()
+                else:
+                    raise ValueError(f"不支持的图片源类型: {type(image_source)}")
+
+            # 转为base64
+            base64_str = base64.b64encode(image_data).decode('utf-8')
+            return base64_str
+
+        except Exception as e:
+            print(f"[错误] 转换base64失败: {e}")
+            raise
 
     def download_and_encode_image(
         self,
@@ -361,3 +533,86 @@ def get_image_base64(
         quality=quality
     )
     return processor.download_and_encode_image(image_url, compress=compress)
+
+
+def compress_image(
+    image_source: Union[str, Path, bytes, Image.Image],
+    max_width: int = 800,
+    max_height: int = 800,
+    quality: int = 75,
+    output_format: str = 'JPEG'
+) -> bytes:
+    """
+    快捷函数：压缩图片
+
+    Args:
+        image_source: 图片源，可以是文件路径、字节数据或PIL Image对象
+        max_width: 压缩后最大宽度
+        max_height: 压缩后最大高度
+        quality: 压缩质量 (1-100)
+        output_format: 输出格式 ('JPEG', 'PNG', 'WEBP')
+
+    Returns:
+        压缩后的图片字节数据
+
+    Examples:
+        >>> # 压缩本地文件
+        >>> compressed = compress_image('photo.jpg', max_width=1024, quality=80)
+        >>> # 压缩字节数据
+        >>> with open('photo.jpg', 'rb') as f:
+        ...     compressed = compress_image(f.read(), quality=60)
+        >>> # 保存压缩后的图片
+        >>> with open('photo_compressed.jpg', 'wb') as f:
+        ...     f.write(compressed)
+    """
+    processor = ImageProcessor(
+        max_width=max_width,
+        max_height=max_height,
+        quality=quality
+    )
+    return processor.compress_image_file(
+        image_source,
+        output_format=output_format
+    )
+
+
+def convert_image_to_base64(
+    image_source: Union[str, Path, bytes, Image.Image],
+    compress: bool = False,
+    max_width: int = 800,
+    max_height: int = 800,
+    quality: int = 75,
+    output_format: str = 'JPEG'
+) -> str:
+    """
+    快捷函数：将图片转换为base64编码字符串
+
+    Args:
+        image_source: 图片源，可以是文件路径、字节数据或PIL Image对象
+        compress: 是否压缩图片
+        max_width: 压缩后最大宽度（仅在compress=True时有效）
+        max_height: 压缩后最大高度（仅在compress=True时有效）
+        quality: 压缩质量（仅在compress=True时有效）
+        output_format: 输出格式（仅在compress=True时有效）
+
+    Returns:
+        base64编码的字符串
+
+    Examples:
+        >>> # 直接转换本地图片
+        >>> base64_str = convert_image_to_base64('photo.jpg')
+        >>> # 压缩后转换
+        >>> base64_str = convert_image_to_base64('photo.jpg', compress=True, quality=60)
+        >>> # 用于API调用
+        >>> data_uri = f"data:image/jpeg;base64,{base64_str}"
+    """
+    processor = ImageProcessor(
+        max_width=max_width,
+        max_height=max_height,
+        quality=quality
+    )
+    return processor.image_to_base64(
+        image_source,
+        compress=compress,
+        output_format=output_format
+    )

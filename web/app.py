@@ -210,7 +210,7 @@ def note_search_formatted():
         "query": "搜索关键词",
         "require_num": 10,
         "sort_type_choice": 0,
-        "note_type": 0,
+        "note_type": 2,
         "note_time": 0,
         "note_range": 0,
         "pos_distance": 0,
@@ -231,7 +231,7 @@ def note_search_formatted():
         formatted_notes = formatted_spider.search_and_format(
             query, require_num, global_cookies,
             data.get('sort_type_choice', 0),
-            data.get('note_type', 0),
+            data.get('note_type', 2),
             data.get('note_time', 0),
             data.get('note_range', 0),
             data.get('pos_distance', 0),
@@ -244,39 +244,148 @@ def note_search_formatted():
         logger.error(f"格式化搜索失败: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/notes/search-with-extract', methods=['POST'])
+def note_search_with_extract():
+    """
+    搜索笔记并智能提取信息：
+    - 正文长度 > 200 字：内容充足，直接返回正文，images 置为空列表
+    - 正文长度 <= 200 字：内容不足，对图片进行 OCR 提取文字，images 替换为提取到的文字列表
+
+    请求体:
+    {
+        "query":           "搜索关键词（必填）",
+        "require_num":     10,
+        "sort_type_choice": 0,
+        "note_type":       2,
+        "note_time":       0,
+        "note_range":      0,
+        "pos_distance":    0,
+        "geo":             null
+    }
+    返回:
+    {
+        "status": "success",
+        "count":  10,
+        "data": [
+            {
+                "id":            "笔记ID",
+                "url":           "笔记URL",
+                "title":         "标题",
+                "content":       "正文",
+                "images":        ["提取的文字1", ...] 或 [],
+                "liked_count":   0,
+                "comment_count": 0,
+                "share_count":   0,
+                "image_extracted": true/false  # 是否对图片做了文字提取
+            },
+            ...
+        ]
+    }
+    """
+    # 正文长度阈值：超过此值则认为内容充足，无需提取图片文字
+    CONTENT_LENGTH_THRESHOLD = 200
+
+    try:
+        if not global_cookies:
+            return jsonify({'error': 'Cookies 未设置'}), 400
+
+        data = request.get_json(force=True, silent=True)
+        if not data or 'query' not in data or 'require_num' not in data:
+            return jsonify({'error': '缺少必需字段: query, require_num'}), 400
+
+        query      = data['query']
+        require_num = data['require_num']
+
+        # 1. 搜索并格式化笔记
+        formatted_notes = formatted_spider.search_and_format(
+            query, require_num, global_cookies,
+            data.get('sort_type_choice', 0),
+            data.get('note_type', 2),
+            data.get('note_time', 0),
+            data.get('note_range', 0),
+            data.get('pos_distance', 0),
+            data.get('geo', None)
+        )
+        logger.info(f"搜索到 {len(formatted_notes)} 篇笔记，关键词: {query!r}")
+
+        # 2. 逐篇判断是否需要图片文字提取
+        result_notes = []
+        for note in formatted_notes:
+            content        = note.get('content', '') or ''
+            title          = note.get('title', '') or ''
+            image_urls     = note.get('images', []) or []
+            need_extract   = len(content) <= CONTENT_LENGTH_THRESHOLD and len(image_urls) > 0
+
+            if need_extract:
+                # 正文内容不足，对图片做 OCR 提取
+                logger.info(
+                    f"笔记 [{note.get('id')}] 正文仅 {len(content)} 字，"
+                    f"对 {len(image_urls)} 张图片进行文字提取"
+                )
+                analysis = analyze_note_relevance(title, image_urls)
+                extracted_text = analysis.get('extracted_text') or ''
+                # images 字段替换为提取到的文字列表（按换行拆分，过滤空行）
+                images_field    = [t for t in extracted_text.splitlines() if t.strip()] if extracted_text else []
+                image_extracted = True
+            else:
+                # 正文充足或无图片，清空 images 字段
+                reason = "正文充足" if len(content) > CONTENT_LENGTH_THRESHOLD else "无图片"
+                logger.info(f"笔记 [{note.get('id')}] {reason}（{len(content)} 字），跳过图片提取")
+                images_field    = []
+                image_extracted = False
+
+            result_notes.append({
+                'url':             note.get('url', ''),
+                'title':           note.get('title', ''),
+                'content':         note.get('content', ''),
+                'image_extracted': image_extracted,
+                'images':          images_field,
+                'liked_count':     note.get('liked_count', 0),
+                'comment_count':   note.get('comment_count', 0),
+                'share_count':     note.get('share_count', 0),
+            })
+
+        return jsonify({'status': 'success', 'count': len(result_notes), 'data': result_notes}), 200
+
+    except Exception as e:
+        logger.error(f"搜索并提取失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/test/analyze-relevance', methods=['POST'])
 def test_analyze_relevance():
     """
     测试 analyze_note_relevance 函数
     请求体:
     {
-        "title":   "笔记标题（必填）",
-        "content": "笔记正文（必填）",
-        "images":  ["图片URL1", "图片URL2"]  // 可选
+        "title":  "笔记标题（必填）",
+        "images": ["图片URL1", "图片URL2"]  // 必填
     }
     返回:
     {
         "status": "success",
         "data": {
-            "relevant":       true/false,
-            "extracted_text": "提取的文字或 null",
-            "reason":         "模型判断理由"
+            "relevant":         true/false,
+            "extracted_text":   "提取的文字或 null",
+            "processed_images": 实际处理的图片数量
         }
     }
     """
     try:
-        data = request.get_json()
+        data = request.get_json(force=True, silent=True)
         if not data:
-            return jsonify({'error': '请求体不能为空'}), 400
-        if 'title' not in data or 'content' not in data:
-            return jsonify({'error': '缺少必需字段: title, content'}), 400
+            return jsonify({'error': '请求体不能为空，需要 Content-Type: application/json 且合法的 JSON 格式'}), 400
+        if 'title' not in data or 'images' not in data:
+            return jsonify({'error': '缺少必需字段: title, images'}), 400
 
-        title   = data['title']
-        content = data['content']
-        images  = data.get('images', None)
+        title  = data['title']
+        images = data['images']
 
-        logger.info(f"测试 analyze_note_relevance — 标题: {title!r}")
-        result = analyze_note_relevance(title, content, images)
+        if not isinstance(images, list):
+            return jsonify({'error': 'images 必须是数组'}), 400
+
+        logger.info(f"测试 analyze_note_relevance — 标题: {title!r}, 图片数: {len(images)}")
+        result = analyze_note_relevance(title, images)
         return jsonify({'status': 'success', 'data': result}), 200
 
     except Exception as e:
