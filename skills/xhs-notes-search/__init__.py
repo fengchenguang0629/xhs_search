@@ -4,16 +4,15 @@
 """
 
 from .scripts.api_client import XHSSearchClient, search_xhs_notes
-from .scripts.image_processor import ImageProcessor, process_xhs_images, get_image_base64
 from .scripts.summarizer import XHSSearchSummarizer, search_and_prepare
+from extensions.image_processor import ImageProcessor, process_xhs_images, get_image_base64
 
 __all__ = [
-    'ImageProcessor',
-    'process_xhs_images',
-    'get_image_base64',
     'XHSSearchClient',
     'search_xhs_notes',
     'XHSSearchSummarizer',
     'search_and_prepare',
+    'ImageProcessor',
+    'process_xhs_images',
+    'get_image_base64',
 ]
-

@@ -12,6 +12,7 @@ from main import Data_Spider
 from dataspider import FormattedDataSpider
 from xhs_utils.common_util import init
 from xhs_utils.cookie_util import trans_cookies
+from extensions.model_client import analyze_note_relevance
 
 # 获取当前 web 目录路径
 WEB_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -242,6 +243,46 @@ def note_search_formatted():
     except Exception as e:
         logger.error(f"格式化搜索失败: {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/test/analyze-relevance', methods=['POST'])
+def test_analyze_relevance():
+    """
+    测试 analyze_note_relevance 函数
+    请求体:
+    {
+        "title":   "笔记标题（必填）",
+        "content": "笔记正文（必填）",
+        "images":  ["图片URL1", "图片URL2"]  // 可选
+    }
+    返回:
+    {
+        "status": "success",
+        "data": {
+            "relevant":       true/false,
+            "extracted_text": "提取的文字或 null",
+            "reason":         "模型判断理由"
+        }
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '请求体不能为空'}), 400
+        if 'title' not in data or 'content' not in data:
+            return jsonify({'error': '缺少必需字段: title, content'}), 400
+
+        title   = data['title']
+        content = data['content']
+        images  = data.get('images', None)
+
+        logger.info(f"测试 analyze_note_relevance — 标题: {title!r}")
+        result = analyze_note_relevance(title, content, images)
+        return jsonify({'status': 'success', 'data': result}), 200
+
+    except Exception as e:
+        logger.error(f"analyze_note_relevance 测试失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 @app.errorhandler(404)
 def not_found(e):

@@ -9,17 +9,7 @@ from typing import Dict, Optional
 
 import requests
 
-# 支持多种导入方式
-try:
-    from .image_processor import ImageProcessor
-except ImportError:
-    try:
-        from image_processor import ImageProcessor
-    except ImportError:
-        import sys
-        import os
-        sys.path.insert(0, os.path.dirname(__file__))
-        from image_processor import ImageProcessor
+from extensions.image_processor import ImageProcessor
 
 
 class XHSSearchClient:
